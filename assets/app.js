@@ -173,45 +173,102 @@ function renderQuiz(moduleId) {
     saveProgress(progress);
     scoreBanner.textContent = `Score: ${score}/${questions.length} — saved!`;
     renderSidebar(moduleId);
+
+    const ratio = score / questions.length;
+    const hardBank = HARD_QUESTIONS[moduleId];
+    if (ratio >= 0.8 && hardBank && hardBank.length) {
+      renderAgentBonusRound(moduleId, hardBank);
+    }
   });
 }
 
-const SANDBOX_TASKS = [
-  { id: "t1", desc: "Print your current working directory", check: (cmd) => cmd === "pwd" },
-  { id: "t2", desc: "Create a directory named 'projects'", check: (cmd) => /^mkdir\s+(-p\s+)?projects$/.test(cmd) },
-  { id: "t3", desc: "Move into the 'projects' directory", check: (cmd) => cmd === "cd projects" },
-  { id: "t4", desc: "Create an empty file named 'notes.txt'", check: (cmd) => /^touch\s+notes\.txt$/.test(cmd) },
-  { id: "t5", desc: "List all files in long format", check: (cmd) => /^ls\s+-la?l?$/.test(cmd) || cmd === "ls -l" },
-  { id: "t6", desc: "View the content of 'notes.txt'", check: (cmd) => cmd === "cat notes.txt" },
-  { id: "t7", desc: "Copy 'notes.txt' to 'notes-backup.txt'", check: (cmd) => cmd === "cp notes.txt notes-backup.txt" },
-  { id: "t8", desc: "Remove 'notes-backup.txt'", check: (cmd) => cmd === "rm notes-backup.txt" },
-];
+// Agent-driven bonus round: unlocked only once the base quiz is mastered (>=80%).
+function renderAgentBonusRound(moduleId, hardBank) {
+  agent.unlockHard(moduleId);
+
+  const banner = document.createElement("div");
+  banner.className = "question-card";
+  banner.innerHTML = `<h3>🤖 Tutor Agent: nice work — here are tougher, scenario-based questions to push further.</h3>`;
+  contentEl.appendChild(banner);
+
+  const bonusState = { answers: new Array(hardBank.length).fill(null) };
+
+  hardBank.forEach((q, qi) => {
+    const card = document.createElement("div");
+    card.className = "question-card";
+    const h3 = document.createElement("h3");
+    h3.textContent = `🔥 Bonus ${qi + 1}. ${q.q}`;
+    card.appendChild(h3);
+
+    const optionsWrap = document.createElement("div");
+    optionsWrap.className = "options";
+
+    q.options.forEach((opt, oi) => {
+      const btn = document.createElement("button");
+      btn.className = "option-btn";
+      btn.textContent = opt;
+      btn.addEventListener("click", () => {
+        if (bonusState.answers[qi] !== null) return;
+        bonusState.answers[qi] = oi;
+        Array.from(optionsWrap.children).forEach((child, idx) => {
+          child.disabled = true;
+          if (idx === q.answer) child.classList.add("correct");
+          else if (idx === oi) child.classList.add("incorrect");
+        });
+        card.querySelector(".explain").classList.add("show");
+      });
+      optionsWrap.appendChild(btn);
+    });
+    card.appendChild(optionsWrap);
+
+    const explain = document.createElement("div");
+    explain.className = "explain";
+    explain.textContent = `💡 ${q.explain}`;
+    card.appendChild(explain);
+
+    contentEl.appendChild(card);
+  });
+}
+
+const agent = new TutorAgent();
 
 function renderTerminal() {
   contentEl.innerHTML = "";
   const header = document.createElement("div");
   header.className = "module-header";
-  header.innerHTML = `<h2>💻 Terminal Sandbox</h2>`;
+  header.innerHTML = `<h2>💻 Terminal Sandbox — 🤖 Agent Mode</h2>`;
   contentEl.appendChild(header);
 
   const intro = document.createElement("p");
   intro.style.color = "var(--muted)";
-  intro.textContent = "A simulated shell (no real system access) so you can safely practice command syntax. Type 'help' to see supported commands. Complete the tasks below by running the matching commands.";
+  intro.textContent = "A simulated shell (no real system access, no API calls) so you can safely practice command syntax. The Tutor Agent gives you one task at a time and gets tougher as you clear each tier. Type 'help' to see supported commands.";
   contentEl.appendChild(intro);
 
-  const taskState = loadProgress();
-  const doneTasks = new Set((taskState._tasks && taskState._tasks) || []);
+  const tier = agent.currentTier();
+  const tierBanner = document.createElement("div");
+  tierBanner.className = "question-card";
+  tierBanner.id = "agent-tier-banner";
+  contentEl.appendChild(tierBanner);
 
   const taskListEl = document.createElement("ul");
   taskListEl.className = "task-list";
-  SANDBOX_TASKS.forEach((t) => {
-    const li = document.createElement("li");
-    li.dataset.taskId = t.id;
-    if (doneTasks.has(t.id)) li.classList.add("done");
-    li.innerHTML = `<span class="task-check"></span><span>${t.desc}</span>`;
-    taskListEl.appendChild(li);
-  });
   contentEl.appendChild(taskListEl);
+
+  const taskCtx = {};
+
+  function refreshTaskPanel() {
+    const currentTier = agent.currentTier();
+    tierBanner.innerHTML = `<h3>🤖 Agent Tier ${currentTier.level + 1}: ${currentTier.label}</h3><p style="color:var(--muted);margin:0;">Complete every task in this tier to unlock a harder one.</p>`;
+    taskListEl.innerHTML = "";
+    currentTier.tasks.forEach((t) => {
+      const li = document.createElement("li");
+      li.dataset.taskId = t.id;
+      if (agent.isChallengeDone(t.id)) li.classList.add("done");
+      li.innerHTML = `<span class="task-check"></span><span>${t.desc}</span>`;
+      taskListEl.appendChild(li);
+    });
+  }
+  refreshTaskPanel();
 
   const wrap = document.createElement("div");
   wrap.className = "terminal-wrap";
@@ -233,17 +290,48 @@ function renderTerminal() {
   wrap.appendChild(inputRow);
   contentEl.appendChild(wrap);
 
-  const term = new Terminal(output, (name, args, fullCmd) => {
-    SANDBOX_TASKS.forEach((t) => {
-      if (!doneTasks.has(t.id) && t.check(fullCmd)) {
-        doneTasks.add(t.id);
-        const li = taskListEl.querySelector(`li[data-task-id="${t.id}"]`);
-        if (li) li.classList.add("done");
-        const p = loadProgress();
-        p._tasks = Array.from(doneTasks);
-        saveProgress(p);
-      }
+  function askFollowUp(task) {
+    const card = document.createElement("div");
+    card.className = "question-card";
+    card.innerHTML = `<h3>🤖 Agent follow-up: ${task.followUp.q}</h3>`;
+    const optionsWrap = document.createElement("div");
+    optionsWrap.className = "options";
+    task.followUp.options.forEach((opt, oi) => {
+      const btn = document.createElement("button");
+      btn.className = "option-btn";
+      btn.textContent = opt;
+      btn.addEventListener("click", () => {
+        Array.from(optionsWrap.children).forEach((child, idx) => {
+          child.disabled = true;
+          if (idx === task.followUp.answer) child.classList.add("correct");
+          else if (idx === oi) child.classList.add("incorrect");
+        });
+        card.querySelector(".explain").classList.add("show");
+      });
+      optionsWrap.appendChild(btn);
     });
+    card.appendChild(optionsWrap);
+    const explain = document.createElement("div");
+    explain.className = "explain";
+    explain.textContent = `💡 ${task.followUp.explain}`;
+    card.appendChild(explain);
+    contentEl.insertBefore(card, wrap);
+  }
+
+  const term = new Terminal(output, (name, args, fullCmd) => {
+    const activeTask = agent.nextIncompleteTask();
+    if (activeTask && activeTask.check(fullCmd, term, taskCtx)) {
+      agent.markChallengeDone(activeTask.id);
+      const li = taskListEl.querySelector(`li[data-task-id="${activeTask.id}"]`);
+      if (li) li.classList.add("done");
+      term.print(`✅ Task complete: ${activeTask.desc}`, "cmd-line");
+      if (activeTask.followUp) askFollowUp(activeTask);
+      const leveledUp = agent.maybeLevelUp();
+      if (leveledUp) {
+        term.print(`🎉 Tier cleared! The agent has unlocked a harder tier: ${agent.currentTier().label}`, "cmd-line");
+        refreshTaskPanel();
+      }
+    }
   });
 
   term.print("Welcome to the Linux-101 practice terminal. Type 'help' for supported commands.");

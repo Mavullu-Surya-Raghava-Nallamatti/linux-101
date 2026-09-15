@@ -8,6 +8,14 @@ A comprehensive, beginner-to-advanced course for learning Linux — covering wha
 
 A companion static web app (`index.html` + `assets/`) lets you quiz yourself on every module and practice real command syntax in a safe, simulated terminal — all client-side, no backend required. Progress is saved in your browser (`localStorage`).
 
+### 🤖 Adaptive Tutor Agent (zero cost, no API keys)
+
+The app includes a rule-based "agent" (`assets/agent.js`) that adapts to your performance — entirely in-browser JavaScript, no LLM API calls, no server, no cost:
+- **Quiz mode**: score 80%+ on a module and the agent unlocks a bonus round of tougher, scenario-based questions for that topic.
+- **Terminal Sandbox**: the agent hands out one task at a time in progressive tiers (Foundations → Combining Commands → Real-World Scenarios), and asks a short follow-up "why" question after each completed task to check real understanding, not just memorized syntax.
+
+Because it's static, it stays free to host on GitHub Pages. If you want true generative AI (natural-language chat, free-form Q&A) later, the recommended zero-cost path is an in-browser model via [WebLLM](https://github.com/mlc-ai/web-llm) (runs fully client-side on WebGPU, no API key) rather than a hosted LLM API.
+
 If the link above 404s, GitHub Pages hasn't been enabled yet for this repo:
 1. Go to **Settings → Pages** on GitHub.
 2. Under **Build and deployment**, set **Source** to `Deploy from a branch`, branch `main`, folder `/ (root)`.
