@@ -4,15 +4,14 @@ A comprehensive, beginner-to-advanced course for learning Linux — covering wha
 
 ## 🎮 Practice app (live on GitHub Pages)
 
-**[➡ Open the practice app](https://<your-github-username>.github.io/linux-101/)**
+**[➡ Open the practice app](https://mavullu-surya-raghava-nallamatti.github.io/linux-101/)**
 
 A companion static web app (`index.html` + `assets/`) lets you quiz yourself on every module and practice real command syntax in a safe, simulated terminal — all client-side, no backend required. Progress is saved in your browser (`localStorage`).
 
-To enable it for your fork/repo:
-1. Push this repo to GitHub.
-2. Go to **Settings → Pages**.
-3. Under **Build and deployment**, set **Source** to `Deploy from a branch`, branch `main`, folder `/ (root)`.
-4. Save — your app will be live at `https://<username>.github.io/<repo-name>/` within a minute or two.
+If the link above 404s, GitHub Pages hasn't been enabled yet for this repo:
+1. Go to **Settings → Pages** on GitHub.
+2. Under **Build and deployment**, set **Source** to `Deploy from a branch`, branch `main`, folder `/ (root)`.
+3. Save — the app will be live at the URL above within a minute or two.
 
 ## How to use this course
 
